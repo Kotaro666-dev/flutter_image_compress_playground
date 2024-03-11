@@ -41,16 +41,17 @@ class _BodyState extends State<_Body> {
       final file = result.files.first;
       final mimeType = file.path != null ? lookupMimeType(file.path!) : null;
       final contentType = mimeType != null ? MediaType.parse(mimeType) : null;
+      final sizeKB = file.size / 1024;
       final newFileDetails = FileDetailsModel(
         fileName: file.name,
         bytes: file.bytes,
-        size: file.size,
+        size: sizeKB.toInt(),
         extension: file.extension,
         mimeType: mimeType,
         contentType: contentType.toString(),
       );
 
-      // TODO: Check content type to allow only jepg, png and heic
+      // TODO: Check content type to allow only jpeg and heic
 
       setState(() {
         _targetFile = File(result.files.first.path!);
@@ -67,16 +68,29 @@ class _BodyState extends State<_Body> {
     }
 
     try {
-      final result = await FlutterImageCompress.compressWithFile(
-        _targetFile!.absolute.path,
-        quality: 85,
-      );
+      Uint8List? result;
+      if (_targetFile!.path.contains('heic')) {
+        debugPrint('targetFile is heic');
+        result = await FlutterImageCompress.compressWithFile(
+          _targetFile!.absolute.path,
+          format: CompressFormat.heic,
+          quality: 50,
+        );
+      } else if (_targetFile!.path.contains('jpeg') ||
+          _targetFile!.path.contains('jpg')) {
+        debugPrint('targetFile is jpeg');
+        result = await FlutterImageCompress.compressWithFile(
+          _targetFile!.absolute.path,
+          format: CompressFormat.jpeg,
+          quality: 50,
+        );
+      }
+
       if (result == null) {
         debugPrint('Compression failed');
       }
 
       _extractFileData(raw: result!);
-      // TODO: Update state
     } on Error catch (e) {
       debugPrint(e.toString());
       debugPrint(e.stackTrace.toString());
@@ -93,9 +107,18 @@ class _BodyState extends State<_Body> {
     final height = decodeImage.height;
     final bytes = raw.lengthInBytes;
     final sizeKB = bytes / 1024;
-    final sizeMB = sizeKB / 1024;
-    debugPrint('sizeKB = $sizeKB');
-    debugPrint('sizeMB = $sizeMB');
+
+    final newFileDetails = FileDetailsModel(
+      fileName: _fileDetailsBeforeCompression.fileName,
+      extension: _fileDetailsBeforeCompression.extension,
+      size: sizeKB.toInt(),
+      mimeType: _fileDetailsBeforeCompression.mimeType,
+      contentType: _fileDetailsBeforeCompression.contentType.toString(),
+    );
+
+    setState(() {
+      _fileDetailsAfterCompression = newFileDetails;
+    });
   }
 
   void _resetData() {
